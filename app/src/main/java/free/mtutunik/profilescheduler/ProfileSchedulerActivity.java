@@ -51,6 +51,7 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
     SQLiteDatabase mDb;
     SimpleCursorAdapter mDataAdapter = null;
     Context mContext = null;
+    AlarmFilter mAlarmFilter = null;
     /**
      * ATTENTION: This was auto-generated to implement the App Indexing API.
      * See https://g.co/AppIndexing/AndroidStudio for more information.
@@ -331,6 +332,7 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
     @Override
     public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
         mDataAdapter.swapCursor(data);
+        mAlarmFilter = new AlarmFilter(data);
     }
 
     @Override
