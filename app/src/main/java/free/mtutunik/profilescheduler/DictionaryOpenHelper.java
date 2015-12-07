@@ -15,22 +15,23 @@ public class DictionaryOpenHelper extends SQLiteOpenHelper {
     public static final String DICTIONARY_TABLE_NAME = "profiles";
     public static final String NAME_FIELD = "profile_name";
     public static final String TYPE_FIELD = "profile_type";
-    public static final String START_TIME_FILED = "start_time";
-    public static final String END_TIME_FILED = "end_time";
-    public static final String STATUS_FILED = "status";
+    public static final String START_TIME_FIELD = "start_time";
+    public static final String END_TIME_FIELD = "end_time";
+    public static final String STATUS_FIELD = "status";
     public static final String ID = "_id";
 
 
-    public static final String[] ALL_FIELDS = new String[] {ID, NAME_FIELD, STATUS_FILED, TYPE_FIELD, START_TIME_FILED, END_TIME_FILED};
+    public static final String[] ALL_FIELDS = new String[] {ID, NAME_FIELD, STATUS_FIELD, TYPE_FIELD,
+                                                            START_TIME_FIELD, END_TIME_FIELD};
 
     private static final String DICTIONARY_TABLE_CREATE =
             "CREATE TABLE IF NOT EXISTS " + DICTIONARY_TABLE_NAME +
                     " (" + ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
                     NAME_FIELD + " TEXT, " +
                     TYPE_FIELD + " TEXT, " +
-                    START_TIME_FILED + "  TEXT, " +
-                    END_TIME_FILED + " TEXT, " +
-                    STATUS_FILED + " INTEGER);";
+                    START_TIME_FIELD + "  TEXT, " +
+                    END_TIME_FIELD + " TEXT, " +
+                    STATUS_FIELD + " INTEGER);";
 
     public static final String ALL_DATA_QUERY = "SELECT * FROM " + DICTIONARY_TABLE_NAME;
 

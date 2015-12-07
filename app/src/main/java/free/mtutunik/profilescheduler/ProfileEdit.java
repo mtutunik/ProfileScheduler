@@ -1,17 +1,12 @@
 package free.mtutunik.profilescheduler;
 
 import android.app.Activity;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.View;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
@@ -30,6 +25,7 @@ public class ProfileEdit extends AppCompatActivity {
     TimePicker mEndTime;
     RadioGroup mRadioGroup;
     int mCurrentRec = -1;
+    int mProfileStatus = -1;
 
     HashMap<String, Integer> mRadioBattonsMap = new HashMap<String, Integer>();
 
@@ -58,9 +54,10 @@ public class ProfileEdit extends AppCompatActivity {
 
         if (intent.hasExtra(DictionaryOpenHelper.ID)) {
             mCurrentRec = intent.getIntExtra(DictionaryOpenHelper.ID, -1);
+            mProfileStatus = intent.getIntExtra(DictionaryOpenHelper.STATUS_FIELD, -1);
             mNameField.setText(intent.getStringExtra(DictionaryOpenHelper.NAME_FIELD));
-            setTimePicker(mStartTime, intent.getStringExtra(DictionaryOpenHelper.START_TIME_FILED));
-            setTimePicker(mEndTime, intent.getStringExtra(DictionaryOpenHelper.END_TIME_FILED));
+            setTimePicker(mStartTime, intent.getStringExtra(DictionaryOpenHelper.START_TIME_FIELD));
+            setTimePicker(mEndTime, intent.getStringExtra(DictionaryOpenHelper.END_TIME_FIELD));
             String profileType = intent.getStringExtra(DictionaryOpenHelper.TYPE_FIELD);
             mRadioGroup.check(mRadioBattonsMap.get(profileType));
         }
@@ -74,12 +71,13 @@ public class ProfileEdit extends AppCompatActivity {
         Intent resultIntent = new Intent();
         if (mNameField.getText() != null) {
             resultIntent.putExtra(DictionaryOpenHelper.ID, mCurrentRec);
+            resultIntent.putExtra(DictionaryOpenHelper.STATUS_FIELD, mProfileStatus);
             String startTime = String.format("%d:%d", mStartTime.getCurrentHour(), mStartTime.getCurrentMinute());
             String endTime = String.format("%d:%d", mEndTime.getCurrentHour(), mStartTime.getCurrentMinute());
             String name = mNameField.getText().toString();
             resultIntent.putExtra(DictionaryOpenHelper.NAME_FIELD, name);
-            resultIntent.putExtra(DictionaryOpenHelper.START_TIME_FILED, startTime);
-            resultIntent.putExtra(DictionaryOpenHelper.END_TIME_FILED, endTime);
+            resultIntent.putExtra(DictionaryOpenHelper.START_TIME_FIELD, startTime);
+            resultIntent.putExtra(DictionaryOpenHelper.END_TIME_FIELD, endTime);
             if (mRadioGroup.getCheckedRadioButtonId() > 0) {
                 RadioButton rb = (RadioButton) findViewById(mRadioGroup.getCheckedRadioButtonId());
                 resultIntent.putExtra(DictionaryOpenHelper.TYPE_FIELD, rb.getText().toString());
