@@ -72,8 +72,13 @@ public class ProfileEdit extends AppCompatActivity {
         if (mNameField.getText() != null) {
             resultIntent.putExtra(DictionaryOpenHelper.ID, mCurrentRec);
             resultIntent.putExtra(DictionaryOpenHelper.STATUS_FIELD, mProfileStatus);
+            mStartTime.setIs24HourView(true);
+            mEndTime.setIs24HourView(true);
             String startTime = String.format("%d:%d", mStartTime.getCurrentHour(), mStartTime.getCurrentMinute());
-            String endTime = String.format("%d:%d", mEndTime.getCurrentHour(), mStartTime.getCurrentMinute());
+            String endTime = String.format("%d:%d", mEndTime.getCurrentHour(), mEndTime.getCurrentMinute());
+            mStartTime.setIs24HourView(false);
+            mEndTime.setIs24HourView(false);
+
             String name = mNameField.getText().toString();
             resultIntent.putExtra(DictionaryOpenHelper.NAME_FIELD, name);
             resultIntent.putExtra(DictionaryOpenHelper.START_TIME_FIELD, startTime);
@@ -100,8 +105,11 @@ public class ProfileEdit extends AppCompatActivity {
         String[] hh_mm = timeAsString.split(":");
         Integer hh = Integer.parseInt(hh_mm[0]);
         Integer mm = Integer.parseInt(hh_mm[1]);
+
         timePicker.setCurrentHour(hh);
-        timePicker.setCurrentHour(mm);
+        timePicker.setCurrentMinute(mm);
+
+
     }
 
     @Override

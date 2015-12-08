@@ -197,7 +197,10 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
     }
 
     private void refreshData() {
-        getLoaderManager().restartLoader(URL_LOADER, null, this);
+        //getLoaderManager().restartLoader(URL_LOADER, null, this);
+        mCursor = loadData();
+        mDataAdapter.swapCursor(null);
+        mDataAdapter.swapCursor(mCursor);
     }
 
     public void addProfile() {
@@ -336,14 +339,13 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
                     @Override
                     public Cursor loadInBackground() {
 
-                        /*
+
                         mDb = mDbHelper.getWritableDatabase();
 
                         return mDb.query(DictionaryOpenHelper.DICTIONARY_TABLE_NAME,
                                 DictionaryOpenHelper.ALL_FIELDS,
                                 null, null, null, null, null);
-                                */
-                        return super.loadInBackground();
+
                     }
                 };
         }
