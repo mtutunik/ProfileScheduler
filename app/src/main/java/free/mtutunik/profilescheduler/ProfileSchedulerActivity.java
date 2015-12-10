@@ -239,8 +239,7 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
         }
         else if (requestCode == ProfileEdit.EDIT_PROFILE) {
             if (resultCode == Activity.RESULT_OK) {
-                mDb.update(DictionaryOpenHelper.DICTIONARY_TABLE_NAME, values,
-                        DictionaryOpenHelper.ID + "=" + recId, null);
+                onRecordEdited(recId, values);
             }
             else if (resultCode == ProfileEdit.DELETE_PROFILE_RESULT) {
                 isOn = false;
@@ -249,8 +248,34 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
             }
         }
 
-        refreshData();
         handleStatusChanged(name, startTime, endTime, profileType, isOn);
+        refreshData();
+    }
+
+
+    private void onRecordEdited(long recId, ContentValues values) {
+        String[] oldRecFields = {DictionaryOpenHelper.NAME_FIELD, DictionaryOpenHelper.START_TIME_FIELD,
+                                 DictionaryOpenHelper.END_TIME_FIELD, DictionaryOpenHelper.TYPE_FIELD};
+        //Cursor oldRec = mDb.query(DictionaryOpenHelper.DICTIONARY_TABLE_NAME,
+        //                          oldRecFields, DictionaryOpenHelper.ID + "=" + recId,
+        //                          null, null, null, null);
+
+        Cursor oldRec = mDb.rawQuery("select * from " + DictionaryOpenHelper.DICTIONARY_TABLE_NAME +
+                                     " where " + DictionaryOpenHelper.ID + "=" + recId, null);
+        oldRec.moveToFirst();
+        String oldStart = oldRec.getString(oldRec.getColumnIndexOrThrow(DictionaryOpenHelper.START_TIME_FIELD));
+        String oldEnd = oldRec.getString(oldRec.getColumnIndexOrThrow(DictionaryOpenHelper.END_TIME_FIELD));
+        String oldName = oldRec.getString(oldRec.getColumnIndexOrThrow(DictionaryOpenHelper.NAME_FIELD));
+        String oldType = oldRec.getString(oldRec.getColumnIndexOrThrow(DictionaryOpenHelper.TYPE_FIELD));
+
+        cancelAlarm(oldName, oldStart, oldType);
+        cancelAlarm(oldName, oldEnd, oldType);
+
+        oldRec.close();
+
+        mDb.update(DictionaryOpenHelper.DICTIONARY_TABLE_NAME, values,
+                   DictionaryOpenHelper.ID + "=" + recId, null);
+
     }
 
     @Override
@@ -376,9 +401,11 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
         AlarmManager alarmMgr = (AlarmManager)this.getSystemService(Context.ALARM_SERVICE);
         Intent intent = new Intent(AlarmFilter.getActionName(name, timeStr));
         intent.putExtra(DictionaryOpenHelper.TYPE_FIELD, profileType);
+        intent.putExtra(DictionaryOpenHelper.NAME_FIELD, name);
+        intent.putExtra(DictionaryOpenHelper.START_TIME_FIELD, timeStr);
         PendingIntent alarmIntent = PendingIntent.getBroadcast(this, 0, intent, 0);
-        alarmMgr.setRepeating(AlarmManager.RTC_WAKEUP, calendar.getTimeInMillis(),
-                REPEAT_INTERVAL, alarmIntent);
+        alarmMgr.setExact(AlarmManager.RTC_WAKEUP, calendar.getTimeInMillis(),
+                alarmIntent);
     }
 
     private void cancelAlarm(String name, String timeStr, String profileType) {
@@ -392,6 +419,13 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
                                      String profileType, boolean isOn) {
 
         if (isOn) {
+            if (!mAlarmFilter.hasAction(AlarmFilter.getActionName(name, start))) {
+                mAlarmFilter.addAction(AlarmFilter.getActionName(name, start));
+            }
+
+            if (!mAlarmFilter.hasAction(AlarmFilter.getActionName(name, end))) {
+                mAlarmFilter.addAction(AlarmFilter.getActionName(name, end));
+            }
             scheduleAlarm(name, start, profileType);
             scheduleAlarm(name, end, profileType);
         }
@@ -400,13 +434,7 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
             cancelAlarm(name, end, profileType);
         }
 
-        if (!mAlarmFilter.hasAction(AlarmFilter.getActionName(name, start))) {
-            mAlarmFilter.addAction(AlarmFilter.getActionName(name, start));
-        }
 
-        if (!mAlarmFilter.hasAction(AlarmFilter.getActionName(name, end))) {
-            mAlarmFilter.addAction(AlarmFilter.getActionName(name, end));
-        }
 
         registerAlarmReceiver();
     }
@@ -418,7 +446,10 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
         mAlarmReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                Log.d(TAG, "AlarmRecever");
+                Log.d(TAG, "AlarmRecever: alarm " + intent.getAction());
+                scheduleAlarm(intent.getStringExtra(DictionaryOpenHelper.NAME_FIELD),
+                              intent.getStringExtra(DictionaryOpenHelper.START_TIME_FIELD),
+                              intent.getStringExtra(DictionaryOpenHelper.TYPE_FIELD));
 
             }
         };
