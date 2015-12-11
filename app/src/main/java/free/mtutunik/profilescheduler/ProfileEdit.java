@@ -22,7 +22,6 @@ public class ProfileEdit extends AppCompatActivity {
 
     EditText mNameField;
     TimePicker mStartTime;
-    TimePicker mEndTime;
     RadioGroup mRadioGroup;
     int mCurrentRec = -1;
     int mProfileStatus = -1;
@@ -38,7 +37,13 @@ public class ProfileEdit extends AppCompatActivity {
 
         mNameField = (EditText) findViewById(R.id.profile_name_editText);
         mStartTime = (TimePicker) findViewById(R.id.start_timePicker);
-        mEndTime = (TimePicker) findViewById(R.id.end_timePicker);
+        mStartTime.setOnTimeChangedListener(new TimePicker.OnTimeChangedListener() {
+            @Override
+            public void onTimeChanged(TimePicker view, int hourOfDay, int minute) {
+                mStartTime.setCurrentHour(hourOfDay);
+                mStartTime.setCurrentMinute(minute);
+            }
+        });
         mRadioGroup = (RadioGroup) findViewById(R.id.profile_type_radioGroup);
 
         if (mRadioBattonsMap.isEmpty()) {
@@ -57,7 +62,6 @@ public class ProfileEdit extends AppCompatActivity {
             mProfileStatus = intent.getIntExtra(DictionaryOpenHelper.STATUS_FIELD, -1);
             mNameField.setText(intent.getStringExtra(DictionaryOpenHelper.NAME_FIELD));
             setTimePicker(mStartTime, intent.getStringExtra(DictionaryOpenHelper.START_TIME_FIELD));
-            setTimePicker(mEndTime, intent.getStringExtra(DictionaryOpenHelper.END_TIME_FIELD));
             String profileType = intent.getStringExtra(DictionaryOpenHelper.TYPE_FIELD);
             mRadioGroup.check(mRadioBattonsMap.get(profileType));
         }
@@ -72,17 +76,14 @@ public class ProfileEdit extends AppCompatActivity {
         if (mNameField.getText() != null) {
             resultIntent.putExtra(DictionaryOpenHelper.ID, mCurrentRec);
             resultIntent.putExtra(DictionaryOpenHelper.STATUS_FIELD, mProfileStatus);
+            boolean is24View = mStartTime.is24HourView();
             mStartTime.setIs24HourView(true);
-            mEndTime.setIs24HourView(true);
             String startTime = String.format("%d:%d", mStartTime.getCurrentHour(), mStartTime.getCurrentMinute());
-            String endTime = String.format("%d:%d", mEndTime.getCurrentHour(), mEndTime.getCurrentMinute());
-            mStartTime.setIs24HourView(false);
-            mEndTime.setIs24HourView(false);
+            mStartTime.setIs24HourView(is24View);
 
             String name = mNameField.getText().toString();
             resultIntent.putExtra(DictionaryOpenHelper.NAME_FIELD, name);
             resultIntent.putExtra(DictionaryOpenHelper.START_TIME_FIELD, startTime);
-            resultIntent.putExtra(DictionaryOpenHelper.END_TIME_FIELD, endTime);
             if (mRadioGroup.getCheckedRadioButtonId() > 0) {
                 RadioButton rb = (RadioButton) findViewById(mRadioGroup.getCheckedRadioButtonId());
                 resultIntent.putExtra(DictionaryOpenHelper.TYPE_FIELD, rb.getText().toString());
@@ -108,8 +109,6 @@ public class ProfileEdit extends AppCompatActivity {
 
         timePicker.setCurrentHour(hh);
         timePicker.setCurrentMinute(mm);
-
-
     }
 
     @Override
