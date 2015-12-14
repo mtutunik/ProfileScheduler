@@ -5,12 +5,14 @@ import android.app.AlarmManager;
 import android.app.LoaderManager;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.CursorLoader;
 import android.content.Intent;
 import android.content.Loader;
 import android.content.UriMatcher;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
@@ -45,7 +47,6 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
     public static final Uri TABLE_URL = Uri.withAppendedPath(CONTENT_URI,
             DictionaryOpenHelper.DICTIONARY_TABLE_NAME);
     private static final int TABLE_QUERY = 1;
-    private static final long REPEAT_INTERVAL = 2 * 60 * 1000;//24 * 60 * 60 * 1000;
 
 
     private DictionaryOpenHelper mDbHelper = new DictionaryOpenHelper(this);
@@ -54,7 +55,8 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
     private SimpleCursorAdapter mDataAdapter = null;
     private Context mContext = null;
     private AlarmFilter mAlarmFilter = null;
-    private BroadcastReceiver mAlarmReceiver = null;
+    private AlarmBroadcastReceiver mAlarmReceiver = null;
+    private boolean mIsExiting = false;
     /**
      * ATTENTION: This was auto-generated to implement the App Indexing API.
      * See https://g.co/AppIndexing/AndroidStudio for more information.
@@ -90,9 +92,17 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
         // See https://g.co/AppIndexing/AndroidStudio for more information.
         client = new GoogleApiClient.Builder(this).addApi(AppIndex.API).build();
 
-        showList();
+        mIsExiting = false;
 
+        mCursor = loadData();
+        showList();
+        mDataAdapter.swapCursor(mCursor);
+        mAlarmFilter = new AlarmFilter(mCursor);
+        registerAlarmReceiver();
+/*
+        showList();
         getLoaderManager().initLoader(URL_LOADER, null, this);
+        */
     }
 
     private Cursor loadData() {
@@ -252,6 +262,7 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
 
         handleStatusChanged(name, startTime, profileType, isOn);
         refreshData();
+        registerAlarmReceiver();
     }
 
 
@@ -269,7 +280,7 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
         String oldName = oldRec.getString(oldRec.getColumnIndexOrThrow(DictionaryOpenHelper.NAME_FIELD));
         String oldType = oldRec.getString(oldRec.getColumnIndexOrThrow(DictionaryOpenHelper.TYPE_FIELD));
 
-        cancelAlarm(oldName, oldStart, oldType);
+        mAlarmReceiver.cancelAlarm(oldName, oldStart, oldType, this);
 
         oldRec.close();
 
@@ -344,6 +355,8 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
 
     @Override
     public void onDestroy() {
+        mIsExiting = true;
+        getLoaderManager().destroyLoader(URL_LOADER);
         super.onDestroy();
         Log.d(TAG, "onDestroyed()");
     }
@@ -389,35 +402,7 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
         mDataAdapter.swapCursor(null);
     }
 
-    private void scheduleAlarm(String name, String timeStr, String profileType) {
-        String[] hh_mm = timeStr.split(":");
-        Integer hh = Integer.parseInt(hh_mm[0]);
-        Integer mm = Integer.parseInt(hh_mm[1]);
-        Calendar calendar = Calendar.getInstance();
-        calendar.setTimeInMillis(System.currentTimeMillis());
-        calendar.set(Calendar.HOUR_OF_DAY, hh);
-        calendar.set(Calendar.MINUTE, mm);
 
-        scheduleAlarm(name, profileType, calendar.getTimeInMillis());
-    }
-
-    private void scheduleAlarm(String name, String profileType, long alarmTimeInMills) {
-        AlarmManager alarmMgr = (AlarmManager)this.getSystemService(Context.ALARM_SERVICE);
-        Intent intent = new Intent(name);
-        intent.putExtra(DictionaryOpenHelper.TYPE_FIELD, profileType);
-        intent.putExtra(DictionaryOpenHelper.NAME_FIELD, name);
-        intent.putExtra(DictionaryOpenHelper.START_TIME_FIELD, alarmTimeInMills);
-        PendingIntent alarmIntent = PendingIntent.getBroadcast(this, 0, intent, PendingIntent.FLAG_ONE_SHOT);
-        alarmMgr.setExact(AlarmManager.RTC_WAKEUP, alarmTimeInMills,
-                          alarmIntent);
-    }
-
-    private void cancelAlarm(String name, String timeStr, String profileType) {
-        AlarmManager alarmMgr = (AlarmManager)this.getSystemService(Context.ALARM_SERVICE);
-        Intent intent = new Intent(name);
-        PendingIntent alarmIntent = PendingIntent.getBroadcast(this, 0, intent, 0);
-        alarmMgr.cancel(alarmIntent);
-    }
 
     private void handleStatusChanged(String name, String start,
                                      String profileType, boolean isOn) {
@@ -425,44 +410,40 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
             if (!mAlarmFilter.hasAction(name)) {
                 mAlarmFilter.addAction(name);
             }
-            scheduleAlarm(name, start, profileType);
+            mAlarmReceiver.scheduleAlarm(name, start, profileType, this);
         }
         else {
-            cancelAlarm(name, start, profileType);
+            mAlarmReceiver.cancelAlarm(name, start, profileType, this);
         }
-
-
-
-        registerAlarmReceiver();
     }
 
     private void registerAlarmReceiver() {
+        Log.d(TAG, "registerAlarmReceiver: isExiting: " + mIsExiting + ", mAlarmReceiver: " + mAlarmReceiver );
+        if (mIsExiting) {
+            return;
+        }
+
         if (mAlarmReceiver != null) {
             unregisterAlarmReceiver();
         }
-        mAlarmReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-
-                long alarmTime = intent.getLongExtra(DictionaryOpenHelper.START_TIME_FIELD, -1);
-                Calendar calendar = Calendar.getInstance();
-                calendar.setTimeInMillis(alarmTime + REPEAT_INTERVAL);
-                Log.d(TAG, "AlarmRecever: alarm " + intent.getAction() + " time: " + calendar.toString());
-
-
-                scheduleAlarm(intent.getStringExtra(DictionaryOpenHelper.NAME_FIELD),
-                        intent.getStringExtra(DictionaryOpenHelper.TYPE_FIELD),
-                        alarmTime + REPEAT_INTERVAL);
-            }
-        };
+        mAlarmReceiver = new AlarmBroadcastReceiver();
 
         registerReceiver(mAlarmReceiver, mAlarmFilter);
     }
 
     private void unregisterAlarmReceiver() {
+        ComponentName receiver = new ComponentName(this, AlarmBroadcastReceiver.class);
+        PackageManager pm = this.getPackageManager();
+
+        pm.setComponentEnabledSetting(receiver,
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                PackageManager.DONT_KILL_APP);
+
+        /*
         if (mAlarmReceiver != null) {
             unregisterReceiver(mAlarmReceiver);
             mAlarmReceiver = null;
         }
+        */
     }
 }
