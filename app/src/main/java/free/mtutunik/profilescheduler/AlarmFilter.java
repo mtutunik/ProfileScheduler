@@ -9,7 +9,7 @@ import android.database.Cursor;
 public class AlarmFilter extends IntentFilter {
 
     public AlarmFilter(Cursor cursor) {
-
+        cursor.moveToPosition(-1);
         while (cursor.moveToNext()) {
             String name =
                     cursor.getString(cursor.getColumnIndexOrThrow(DictionaryOpenHelper.NAME_FIELD));
