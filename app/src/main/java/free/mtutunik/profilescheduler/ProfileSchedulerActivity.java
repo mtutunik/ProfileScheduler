@@ -49,19 +49,8 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
     private static final int TABLE_QUERY = 1;
 
 
-    private DictionaryOpenHelper mDbHelper = new DictionaryOpenHelper(this);
-    private Cursor mCursor = null;
-    private SQLiteDatabase mDb;
     private SimpleCursorAdapter mDataAdapter = null;
-    private Context mContext = null;
-    private AlarmFilter mAlarmFilter = null;
-    private AlarmBroadcastReceiver mAlarmReceiver = null;
     private boolean mIsExiting = false;
-    /**
-     * ATTENTION: This was auto-generated to implement the App Indexing API.
-     * See https://g.co/AppIndexing/AndroidStudio for more information.
-     */
-    private GoogleApiClient client;
     private static final UriMatcher sUriMatcher;
 
     static {
@@ -70,7 +59,9 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
         sUriMatcher = new UriMatcher(0);
 
         sUriMatcher.addURI(AUTHORITY, DictionaryOpenHelper.DICTIONARY_TABLE_NAME, TABLE_QUERY);
-    };
+    }
+
+    ;
 
 
     @Override
@@ -88,44 +79,23 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
             }
         });
 
-        // ATTENTION: This was auto-generated to implement the App Indexing API.
-        // See https://g.co/AppIndexing/AndroidStudio for more information.
-        client = new GoogleApiClient.Builder(this).addApi(AppIndex.API).build();
-
         mIsExiting = false;
 
-        mCursor = loadData();
+        DbHelper.init(this);
         showList();
-        mDataAdapter.swapCursor(mCursor);
-        mAlarmFilter = new AlarmFilter(mCursor);
-        registerAlarmReceiver();
+        mDataAdapter.swapCursor(DbHelper.getCursor());
+
 /*
         showList();
         getLoaderManager().initLoader(URL_LOADER, null, this);
         */
     }
 
-    private Cursor loadData() {
-        Cursor cursor = null;
-        try {
-            if (mDb == null) {
-                mDb = mDbHelper.getWritableDatabase();
-            }
-
-            cursor = mDb.query(DictionaryOpenHelper.DICTIONARY_TABLE_NAME,
-                    DictionaryOpenHelper.ALL_FIELDS,
-                    null, null, null, null, null);
-        } catch (Exception e) {
-            Log.d(TAG, e.toString());
-        }
-
-        return cursor;
-    }
 
     private void showList() {
         String[] columns = new String[]{DictionaryOpenHelper.NAME_FIELD,
-                                        DictionaryOpenHelper.START_TIME_FIELD,
-                                        DictionaryOpenHelper.STATUS_FIELD};
+                DictionaryOpenHelper.START_TIME_FIELD,
+                DictionaryOpenHelper.STATUS_FIELD};
         int[] ids = new int[]{R.id.profile_name, R.id.start_time, R.id.profile_status};
 
         mDataAdapter = new SimpleCursorAdapter(this, R.layout.profile_list_layout, null, columns, ids);
@@ -138,7 +108,7 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
                 Log.d(TAG, "setViewValue: columnIndex: " + columnIndex + ", val: " + cursor.getInt(columnIndex));
                 switch (columnIndex) {
                     case 1:
-                        TextView nameTextView = (TextView)view;
+                        TextView nameTextView = (TextView) view;
                         nameTextView.setText(cursor.getString(columnIndex));
                         break;
 
@@ -154,8 +124,7 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
                                 int recId = cursor.getInt(0);
                                 ContentValues values = new ContentValues();
                                 values.put(DictionaryOpenHelper.STATUS_FIELD, checkBox.isChecked() ? 1 : 0);
-                                mDb.update(DictionaryOpenHelper.DICTIONARY_TABLE_NAME, values,
-                                        DictionaryOpenHelper.ID + "=" + recId, null);
+                                DbHelper.update(recId, values);
                                 refreshData();
                                 String name =
                                         cursor.getString(cursor.getColumnIndexOrThrow(DictionaryOpenHelper.NAME_FIELD));
@@ -170,7 +139,7 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
                         break;
 
                     case 4:
-                        TextView timeTextView = (TextView)view;
+                        TextView timeTextView = (TextView) view;
                         timeTextView.setText(cursor.getString(columnIndex));
                         break;
                 }
@@ -212,9 +181,8 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
 
     private void refreshData() {
         //getLoaderManager().restartLoader(URL_LOADER, null, this);
-        mCursor = loadData();
         mDataAdapter.swapCursor(null);
-        mDataAdapter.swapCursor(mCursor);
+        mDataAdapter.swapCursor(DbHelper.refreshCursor());
     }
 
     public void addProfile() {
@@ -241,51 +209,45 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
         values.put(DictionaryOpenHelper.START_TIME_FIELD, startTime);
         values.put(DictionaryOpenHelper.TYPE_FIELD, profileType);
 
-        mDb = mDbHelper.getWritableDatabase();
-
         if (requestCode == ProfileEdit.NEW_PROFILE) {
 
             values.put(DictionaryOpenHelper.STATUS_FIELD, 1);
             isOn = true;
-            recId = mDb.insert(DictionaryOpenHelper.DICTIONARY_TABLE_NAME, null, values);
-        }
-        else if (requestCode == ProfileEdit.EDIT_PROFILE) {
+            recId = DbHelper.insert(values);
+        } else if (requestCode == ProfileEdit.EDIT_PROFILE) {
             if (resultCode == Activity.RESULT_OK) {
                 onRecordEdited(recId, values);
-            }
-            else if (resultCode == ProfileEdit.DELETE_PROFILE_RESULT) {
+            } else if (resultCode == ProfileEdit.DELETE_PROFILE_RESULT) {
                 isOn = false;
-                mDb.delete(DictionaryOpenHelper.DICTIONARY_TABLE_NAME,
-                           DictionaryOpenHelper.ID + "=" + recId, null);
+                DbHelper.delete(recId);
             }
         }
 
         handleStatusChanged(name, startTime, profileType, isOn);
         refreshData();
-        registerAlarmReceiver();
     }
 
 
     private void onRecordEdited(long recId, ContentValues values) {
         String[] oldRecFields = {DictionaryOpenHelper.NAME_FIELD, DictionaryOpenHelper.START_TIME_FIELD,
-                                 DictionaryOpenHelper.END_TIME_FIELD, DictionaryOpenHelper.TYPE_FIELD};
+                DictionaryOpenHelper.END_TIME_FIELD, DictionaryOpenHelper.TYPE_FIELD};
         //Cursor oldRec = mDb.query(DictionaryOpenHelper.DICTIONARY_TABLE_NAME,
         //                          oldRecFields, DictionaryOpenHelper.ID + "=" + recId,
         //                          null, null, null, null);
 
-        Cursor oldRec = mDb.rawQuery("select * from " + DictionaryOpenHelper.DICTIONARY_TABLE_NAME +
-                                     " where " + DictionaryOpenHelper.ID + "=" + recId, null);
+        Cursor oldRec = DbHelper.queryRec(recId);
         oldRec.moveToFirst();
         String oldStart = oldRec.getString(oldRec.getColumnIndexOrThrow(DictionaryOpenHelper.START_TIME_FIELD));
         String oldName = oldRec.getString(oldRec.getColumnIndexOrThrow(DictionaryOpenHelper.NAME_FIELD));
         String oldType = oldRec.getString(oldRec.getColumnIndexOrThrow(DictionaryOpenHelper.TYPE_FIELD));
 
-        mAlarmReceiver.cancelAlarm(oldName, oldStart, oldType, this);
-
         oldRec.close();
 
-        mDb.update(DictionaryOpenHelper.DICTIONARY_TABLE_NAME, values,
-                DictionaryOpenHelper.ID + "=" + recId, null);
+
+        handleStatusChanged(oldName, oldStart, oldType, false);
+
+
+        DbHelper.update(recId, values);
 
     }
 
@@ -314,43 +276,11 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
     @Override
     public void onStart() {
         super.onStart();
-
-        // ATTENTION: This was auto-generated to implement the App Indexing API.
-        // See https://g.co/AppIndexing/AndroidStudio for more information.
-        client.connect();
-        Action viewAction = Action.newAction(
-                Action.TYPE_VIEW, // TODO: choose an action type.
-                "ProfileScheduler Page", // TODO: Define a title for the content shown.
-                // TODO: If you have web page content that matches this app activity's content,
-                // make sure this auto-generated web page URL is correct.
-                // Otherwise, set the URL to null.
-                Uri.parse("http://host/path"),
-                // TODO: Make sure this auto-generated app deep link URI is correct.
-                Uri.parse("android-app://free.mtutunik.profilescheduler/http/host/path")
-        );
-        AppIndex.AppIndexApi.start(client, viewAction);
-
-        mContext = getApplicationContext();
     }
 
     @Override
     public void onStop() {
         super.onStop();
-
-        // ATTENTION: This was auto-generated to implement the App Indexing API.
-        // See https://g.co/AppIndexing/AndroidStudio for more information.
-        Action viewAction = Action.newAction(
-                Action.TYPE_VIEW, // TODO: choose an action type.
-                "ProfileScheduler Page", // TODO: Define a title for the content shown.
-                // TODO: If you have web page content that matches this app activity's content,
-                // make sure this auto-generated web page URL is correct.
-                // Otherwise, set the URL to null.
-                Uri.parse("http://host/path"),
-                // TODO: Make sure this auto-generated app deep link URI is correct.
-                Uri.parse("android-app://free.mtutunik.profilescheduler/http/host/path")
-        );
-        AppIndex.AppIndexApi.end(client, viewAction);
-        client.disconnect();
     }
 
     @Override
@@ -376,14 +306,7 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
                 ) {
                     @Override
                     public Cursor loadInBackground() {
-
-
-                        mDb = mDbHelper.getWritableDatabase();
-
-                        return mDb.query(DictionaryOpenHelper.DICTIONARY_TABLE_NAME,
-                                DictionaryOpenHelper.ALL_FIELDS,
-                                null, null, null, null, null);
-
+                        return DbHelper.queryAll();
                     }
                 };
         }
@@ -393,8 +316,6 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
     @Override
     public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
         mDataAdapter.swapCursor(data);
-        mAlarmFilter = new AlarmFilter(data);
-        registerAlarmReceiver();
     }
 
     @Override
@@ -403,9 +324,9 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
     }
 
 
-
     private void handleStatusChanged(String name, String start,
                                      String profileType, boolean isOn) {
+        /*
         if (isOn) {
             if (!mAlarmFilter.hasAction(name)) {
                 mAlarmFilter.addAction(name);
@@ -415,35 +336,21 @@ public class ProfileSchedulerActivity extends AppCompatActivity implements
         else {
             mAlarmReceiver.cancelAlarm(name, start, profileType, this);
         }
-    }
-
-    private void registerAlarmReceiver() {
-        Log.d(TAG, "registerAlarmReceiver: isExiting: " + mIsExiting + ", mAlarmReceiver: " + mAlarmReceiver );
-        if (mIsExiting) {
-            return;
-        }
-
-        if (mAlarmReceiver != null) {
-            unregisterAlarmReceiver();
-        }
-        mAlarmReceiver = new AlarmBroadcastReceiver();
-
-        registerReceiver(mAlarmReceiver, mAlarmFilter);
-    }
-
-    private void unregisterAlarmReceiver() {
-        ComponentName receiver = new ComponentName(this, AlarmBroadcastReceiver.class);
-        PackageManager pm = this.getPackageManager();
-
-        pm.setComponentEnabledSetting(receiver,
-                PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-                PackageManager.DONT_KILL_APP);
-
-        /*
-        if (mAlarmReceiver != null) {
-            unregisterReceiver(mAlarmReceiver);
-            mAlarmReceiver = null;
-        }
         */
+
+        String[] hh_mm = start.split(":");
+        Integer hh = Integer.parseInt(hh_mm[0]);
+        Integer mm = Integer.parseInt(hh_mm[1]);
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTimeInMillis(System.currentTimeMillis());
+        calendar.set(Calendar.HOUR_OF_DAY, hh);
+        calendar.set(Calendar.MINUTE, mm);
+
+        Intent serviceIntent = new Intent(this, ProfileSchedulerServiceBroadcastReceiver.class);
+        serviceIntent.putExtra(DictionaryOpenHelper.NAME_FIELD, name);
+        serviceIntent.putExtra(DictionaryOpenHelper.START_TIME_FIELD, calendar.getTimeInMillis());
+        serviceIntent.putExtra(DictionaryOpenHelper.TYPE_FIELD, profileType);
+        serviceIntent.putExtra(DictionaryOpenHelper.STATUS_FIELD, isOn);
+        sendBroadcast(serviceIntent);
     }
 }
